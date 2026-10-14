@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { useClientActivity } from "@/hooks/use-client-activity";
 import { useAppVisible } from "@/hooks/use-app-visible";
 import { startPushNotifications } from "@/push-notifications";
+import { isCarMessagingAgent, startCarMessaging } from "@/car-messaging";
 import {
   createSetAgentInitializing,
   refreshAgentInitializationTimeout,
@@ -263,6 +264,7 @@ function SessionProviderInternal({ children, serverId, client }: SessionProvider
     focusedTerminalId,
   });
   useEffect(() => startPushNotifications({ client, serverId }), [client, serverId]);
+  useEffect(() => startCarMessaging({ client, serverId }), [client, serverId]);
 
   const notifyAgentAttention = useCallback(
     (params: {
@@ -275,6 +277,10 @@ function SessionProviderInternal({ children, serverId, client }: SessionProvider
       const session = useSessionStore.getState().sessions[serverId];
       const attentionFocusedAgentId = session?.focusedAgentId ?? null;
       if (params.reason === "error") {
+        return;
+      }
+      // The car conversation already delivers this agent's messages.
+      if (isCarMessagingAgent(serverId, params.agentId)) {
         return;
       }
       const isActivelyVisible = getIsAppActivelyVisible(appState);

@@ -1,0 +1,98 @@
+name: Android Personal APK
+
+# Builds the self-signed "personal" app variant (sh.paseo.personal) from source on GitHub's
+# runner, without EAS or Firebase, and publishes it on the `personal-apk` prerelease.
+on:
+  workflow_dispatch:
+  push:
+    branches: [verwalter]
+    paths:
+      - "packages/app/**"
+      - "packages/client/**"
+      - "packages/protocol/**"
+      - ".github/workflows/android-personal-apk.yml"
+
+concurrency:
+  group: android-personal-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      APP_VARIANT: personal
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+      PUPPETEER_SKIP_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install JS dependencies
+        run: node scripts/npm-retry.mjs ci
+
+      - name: Build app workspace dependencies
+        run: |
+          npm run build:app-deps
+          npm run build:terminal-webview --workspace=@getpaseo/app
+
+      - name: Generate Android project
+        working-directory: packages/app
+        run: npx expo prebuild --platform android --clean --non-interactive
+
+      - name: Build release APK (arm64)
+        working-directory: packages/app/android
+        env:
+          NODE_ENV: production
+        run: >-
+          ./gradlew :app:assembleRelease
+          -PreactNativeArchitectures=arm64-v8a
+          -x lint -x lintVitalAnalyzeRelease -x lintVitalRelease
+          -x generateReleaseLintModel -x generateReleaseLintVitalModel
+          --no-daemon
+
+      - name: Collect APK
+        id: apk
+        run: |
+          set -euo pipefail
+          short_sha="$(git rev-parse --short HEAD)"
+          asset="paseo-verwalter-${short_sha}.apk"
+          cp packages/app/android/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/$asset"
+          cp "$RUNNER_TEMP/$asset" "$RUNNER_TEMP/paseo-verwalter-latest.apk"
+          echo "asset=$asset" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paseo-verwalter-apk
+          path: ${{ runner.temp }}/${{ steps.apk.outputs.asset }}
+
+      - name: Publish on the personal-apk prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if ! gh release view personal-apk --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release create personal-apk --repo "${{ github.repository }}" --prerelease \
+              --target "${{ github.sha }}" --title "Paseo Verwalter (persönlicher Build)" \
+              --notes "Selbst gebaute Android-App mit Android-Auto-Anbindung für den Verwalter."
+          fi
+          gh release upload personal-apk --repo "${{ github.repository }}" --clobber \
+            "$RUNNER_TEMP/paseo-verwalter-latest.apk"

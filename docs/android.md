@@ -4,14 +4,26 @@
 
 Controlled by `APP_VARIANT` in `packages/app/app.config.js` (vanilla Expo, no custom Gradle plugin):
 
-| Variant       | App name    | Package ID       |
-| ------------- | ----------- | ---------------- |
-| `production`  | Paseo       | `sh.paseo`       |
-| `development` | Paseo Debug | `sh.paseo.debug` |
+| Variant       | App name        | Package ID          |
+| ------------- | --------------- | ------------------- |
+| `production`  | Paseo           | `sh.paseo`          |
+| `development` | Paseo Debug     | `sh.paseo.debug`    |
+| `personal`    | Paseo Verwalter | `sh.paseo.personal` |
 
 EAS profiles: `development`, `production`, and `production-apk` in `packages/app/eas.json`.
 
 `development` uses Android `debug`.
+
+`personal` is a self-built release for forks: no Firebase, so no remote push, and it installs next to the store app. `.github/workflows/android-personal-apk.yml` builds it from source on a GitHub runner (no EAS) and attaches it to the `personal-apk` prerelease. Release builds from `expo prebuild` sign with the template's fixed debug key, so each new build installs as an update.
+
+## Android Auto messaging
+
+`modules/paseo-car-messaging` makes the app an Android Auto messaging app. Android Auto has no category for conversational assistants yet, so the agent labeled `role=concierge` speaks through conversation notifications: Android Auto reads them aloud and the driver answers by voice.
+
+- Android Auto only shows notifications with `MessagingStyle`, a reply action carrying a `RemoteInput` and `SEMANTIC_ACTION_REPLY`, and an invisible mark-as-read action. Both actions must not show UI. Drop any of these and the message never reaches the car.
+- There is no remote push in this path. While a concierge exists, a `remoteMessaging` foreground service keeps the process, and with it the daemon connection, alive. Android refuses to start that service from the background, so it starts the next time the app is in the foreground.
+- Replies go into a native queue first and JS drains it, so a reply spoken while the connection is down reaches the agent after reconnect.
+- Sideloaded apps only appear in Android Auto after you enable **Unknown sources** in Android Auto's developer settings.
 
 ## Version codes
 

@@ -91,6 +91,13 @@ const variants = {
       fallbackRelativePath: "./.secrets/GoogleService-Info.debug.plist",
     }),
   },
+  // Self-built release that installs next to the store app. No Firebase, so no remote push.
+  personal: {
+    name: "Paseo Verwalter",
+    packageId: "sh.paseo.personal",
+    googleServicesFile: undefined,
+    googleServiceInfoPlist: undefined,
+  },
 };
 
 const variant = variants[appVariant] ?? variants.production;

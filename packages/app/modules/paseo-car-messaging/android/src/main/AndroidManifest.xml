@@ -1,0 +1,21 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING" />
+
+  <application>
+    <!-- Declares the app as an Android Auto messaging app (notification-based). -->
+    <meta-data
+      android:name="com.google.android.gms.car.application"
+      android:resource="@xml/automotive_app_desc" />
+
+    <service
+      android:name="sh.paseo.car.CarMessagingService"
+      android:exported="false"
+      android:foregroundServiceType="remoteMessaging" />
+
+    <receiver
+      android:name="sh.paseo.car.CarMessageActionReceiver"
+      android:exported="false" />
+  </application>
+</manifest>
